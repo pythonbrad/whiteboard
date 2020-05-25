@@ -1,27 +1,24 @@
 #!/usr/bin/wish
+#====================================================================#
+#     Editor written in Tcl/Tk for editing open source project       #
+#		            (c) Fomegne Meudje; 25-05-20                     #
+#====================================================================#
 #    Author: pythonbrad
 #    Email: fomegnemeudje@outlook.com
 #    Github: http://github.com/pythonbrad
-#
-# * LICENSE
 # * 
 # * Copyright 2020 pythonbrad <fomegnemeudje@outlook.com>
 # * 
-# * This program is free software; you can redistribute it and/or modify
-# * it under the terms of the GNU General Public License as published by
-# * the Free Software Foundation; either version 2 of the License, or
-# * (at your option) any later version.
-# * 
-# * This program is distributed in the hope that it will be useful,
-# * but WITHOUT ANY WARRANTY; without even the implied warranty of
-# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# * GNU General Public License for more details.
-# * 
-# * You should have received a copy of the GNU General Public License
-# * along with this program; if not, write to the Free Software
-# * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-# * MA 02110-1301, USA.
-# * 
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
 
 package require Tk 8.6
 
@@ -37,6 +34,9 @@ oo::class create Board {
 		variable current_item ""
 		variable selected_items ""
 		variable old_cursor_coord ""
+		variable current_scale_factor 0
+		variable canvas_height $height
+		variable canvas_width $width
 		
 		# We create the board
 		variable master [frame .master]
@@ -51,6 +51,10 @@ oo::class create Board {
 		
 		# We make the tools layout
 		frame $master.tools
+		
+		#
+		# USE POST COMMAND WITH MENUBUTTON WHILE THE EVENT INVOKE IF WANT USED AN SIMPLE BUTTON
+		#
 		
 		# We build the color tools
 		variable button_color [ttk::menubutton $master.tools.color -text color]
@@ -75,36 +79,38 @@ oo::class create Board {
 		$button_size config -menu $button_size.menu
 		
 		variable button_image [ttk::button $master.tools.image -text image -command "$self add_image {}"]
-		variable button_select [ttk::button $master.tools.select -text select -command "$self selecting_mode"]
+		
+		# We build  the select tools
+		variable button_select [ttk::menubutton $master.tools.select -text select]
+		# We build the select menu
+		menu $button_select.menu -tearoff 0
+		# We add command
+		$button_select.menu add command -label drag -command "$self select_items"
+		$button_select.menu add command -label all -command "$self select_all_items"
+		# We addd the select menu
+		$button_select config -menu $button_select.menu
 		
 		# We build the move tools
-		variable button_move [ttk::menubutton $master.tools.move -text move]
-		# We build the move menu
-		menu $button_move.menu -tearoff 0
-		# We add command
-		$button_move.menu add command -label selected -command "$self move_items_selected"
-		$button_move.menu add command -label all -command "$self move_all_items"
-		# We addd the move menu
-		$button_move config -menu $button_move.menu
+		variable button_move [ttk::button $master.tools.move -text move -command "$self move_items_selected"]
 		
 		# We build the delete tools
-		variable button_delete [ttk::menubutton $master.tools.delete -text delete]
-		# We build the delete menu
-		menu $button_delete.menu -tearoff 0
-		# We add command
-		$button_delete.menu add command -label selected -command "$self delete_items_selected"
-		$button_delete.menu add command -label all -command "$self delete_all_items"
-		# We addd the delete menu
-		$button_delete config -menu $button_delete.menu
+		variable button_delete [ttk::button $master.tools.delete -text delete -command "$self delete_items_selected"]
 		
 		# We build the duplicated tools
-		variable button_duplicated [ttk::menubutton $master.tools.duplicated -text duplicated]
-		# We build the duplicated menu
-		menu $button_duplicated.menu -tearoff 0
+		variable button_duplicated [ttk::button $master.tools.duplicated -text duplicate -command "$self duplicate_items_selected"]
+		
+		# We build the scale tools
+		variable button_scale [ttk::menubutton $master.tools.sclale -text scale]
+		# We build the scale menu
+		menu $button_scale.menu -tearoff 0
 		# We add command
-		$button_duplicated.menu add command -label selected -command "$self duplicated_items_selected"
-		# We addd the duplicated menu
-		$button_duplicated config -menu $button_duplicated.menu
+		menu $button_scale.menu.factor -tearoff 0
+		$button_scale.menu.factor add radiobutton -label 1 -command "$self change_current_scale_factor 1"
+		$button_scale.menu.factor add radiobutton -label -1 -command "$self change_current_scale_factor -1"
+		$button_scale.menu add cascade -label factor -menu $button_scale.menu.factor
+		$button_scale.menu add command -label scale -command "$self scale_items_selected"
+		# We addd the scale menu
+		$button_scale config -menu $button_scale.menu
 		
 		# We build the board
 		pack $master
@@ -118,6 +124,7 @@ oo::class create Board {
 		pack $button_move -side left
 		pack $button_delete -side left
 		pack $button_duplicated -side left
+		pack $button_scale -side left
 	}
 	method change_color color {
 		variable button_color
@@ -217,10 +224,6 @@ oo::class create Board {
 					set move_x [expr $x - $old_x]
 					set move_y [expr $y - $old_y]
 					# We move item
-					# We verify if all items to move
-					if [string equal $selected_items all] {
-						variable selected_items [$canvas find all]
-					}
 					foreach item $selected_items {
 						$canvas move $item $move_x $move_y
 					}
@@ -235,9 +238,14 @@ oo::class create Board {
 			}
 		}
 	}
-	method selecting_mode {} {
+	method select_items {} {
 		# We change the mode
 		variable current_mode selecting
+	}
+	method select_all_items {} {
+		variable canvas
+		# We get all items
+		variable selected_items [$canvas find all]
 	}
 	method delete_items_selected {} {
 		# We change the mode
@@ -250,19 +258,9 @@ oo::class create Board {
 		}
 		variable selected_items ""
 	}
-	method delete_all_items {} {
-		# We marl all items
-		variable selected_items all
-		my delete_items_selected
-	}
 	method move_items_selected {} {
 		# We change the mode
 		variable current_mode moving
-	}
-	method move_all_items {} {
-		# We mark all items
-		variable selected_items all
-		my move_items_selected
 	}
 	method add_image filename {
 		variable master
@@ -284,7 +282,7 @@ oo::class create Board {
 		lappend image_loaded $img
 		return $img
 	}
-	method duplicated_items_selected {} {
+	method duplicate_items_selected {} {
 		variable selected_items
 		variable canvas
 		# We duplicate each item
@@ -304,6 +302,22 @@ oo::class create Board {
 				eval $canvas itemconfig $new_item $config
 			}
 		}
+	}
+	method scale_items_selected {} {
+		variable selected_items
+		variable canvas
+		variable current_scale_factor
+		variable canvas_height
+		variable canvas_width
+		# We scale all items selected
+		foreach item $selected_items {
+			set factor [expr pow(2, $current_scale_factor)]
+			# We scale with for origin the middle of the canvas
+			$canvas scale $item [expr $canvas_width/2] [expr $canvas_height/2] $factor $factor
+		}
+	}
+	method change_current_scale_factor factor {
+		variable current_scale_factor $factor
 	}
 	destructor {
 		variable master
