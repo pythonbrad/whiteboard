@@ -1,11 +1,5 @@
 source eduboard.tcl
 
-#NB: do like delecte all item and delecte selected, to don't repeat me
-#the select normal use the select selected
-
-#moving selected (items selected)
-#moving normal (select item while the click)
-
 #button scale (all obj) selected and normal scale (select item while the click). A window will be show to select enter the height and width
 
 

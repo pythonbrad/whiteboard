@@ -29,13 +29,13 @@ oo::class create Board {
 	constructor {classname width height bgcolor} {
 		# We init variable
 		variable self $classname
+		variable image_loaded ""
 		variable current_color #123456
 		variable current_size 1
 		variable current_mode ""
 		variable can_draw 0
 		variable current_item ""
 		variable selected_items ""
-		variable selector_init 0
 		variable old_cursor_coord ""
 		
 		# We create the board
@@ -97,6 +97,15 @@ oo::class create Board {
 		# We addd the delete menu
 		$button_delete config -menu $button_delete.menu
 		
+		# We build the duplicated tools
+		variable button_duplicated [ttk::menubutton $master.tools.duplicated -text duplicated]
+		# We build the duplicated menu
+		menu $button_duplicated.menu -tearoff 0
+		# We add command
+		$button_duplicated.menu add command -label selected -command "$self duplicated_items_selected"
+		# We addd the duplicated menu
+		$button_duplicated config -menu $button_duplicated.menu
+		
 		# We build the board
 		pack $master
 		pack $master.body
@@ -108,6 +117,7 @@ oo::class create Board {
 		pack $button_select -side left
 		pack $button_move -side left
 		pack $button_delete -side left
+		pack $button_duplicated -side left
 	}
 	method change_color color {
 		variable button_color
@@ -144,12 +154,10 @@ oo::class create Board {
 		# We analyse the current mode
 		switch -- $current_mode {
 			selecting {
-				# We init the selector
-				if !$selector_init {
-					$canvas create rectangle 0 0 0 0 -tag selector
-				}
+				# We reset the selector
+				$canvas create rectangle 0 0 0 0 -tag selector
 				$canvas coords selector $x $y $x $y
-				$canvas itemconfig selector -outline $current_color
+				$canvas itemconfig selector -outline $current_color -fill $current_color
 				variable can_draw 1
 			}
 			moving {
@@ -177,12 +185,12 @@ oo::class create Board {
 				variable selected_items [eval $canvas find overlapping $coords]
 			}
 			moving {
-				# We hide the selector
-				$canvas coords selector 0 0 0 0
+				# We clean the selector
+				$canvas delete selector
 			}
 			deleting {
-				# We hide the selector
-				$canvas coords selector 0 0 0 0
+				# We clean the selector
+				$canvas delete selector
 			}
 		}
 		variable current_mode ""
@@ -266,8 +274,35 @@ oo::class create Board {
 		}
 		# We verify if filename got
 		if [string length $filename] {
-			set img [image create photo -file $filename]
+			set img [my load_image $filename]
 			$canvas create image 10 10 -image $img
+		}
+	}
+	method load_image filename {
+		variable image_loaded
+		set img [image create photo -file $filename]
+		lappend image_loaded $img
+		return $img
+	}
+	method duplicated_items_selected {} {
+		variable selected_items
+		variable canvas
+		# We duplicate each item
+		foreach item $selected_items {
+			# We verify if item exist
+			if [string length [$canvas find withtag $item]] {
+				# We get the type, coords and config
+				set type [$canvas type $item]
+				set coords [$canvas coords $item]
+				set config ""
+				# We get key and value
+				foreach c [$canvas itemconfig $item] {
+					lappend config [lindex $c 0] [lindex $c end]
+				}
+				# We create a new item with same type, config and coord
+				set new_item [eval $canvas create $type $coords]
+				eval $canvas itemconfig $new_item $config
+			}
 		}
 	}
 	destructor {
