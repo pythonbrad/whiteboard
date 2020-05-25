@@ -15,7 +15,7 @@ proc launch {} {
 set test 1
 
 if $test {
-	Board create board board 320 600 black
+	Board create board board 320 600 white
 } else {
 	pack [frame .config]
 	pack [ttk::label .config.l1 -text Width:]

@@ -157,7 +157,7 @@ oo::class create Board {
 				# We reset the selector
 				$canvas create rectangle 0 0 0 0 -tag selector
 				$canvas coords selector $x $y $x $y
-				$canvas itemconfig selector -outline $current_color -fill $current_color
+				$canvas itemconfig selector -outline $current_color
 				variable can_draw 1
 			}
 			moving {
