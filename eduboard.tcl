@@ -21,9 +21,10 @@
 
 
 package require Tk 8.6
+source resize.tcl
 
 oo::class create Board {
-	constructor {classname width height bgcolor} {
+	constructor {classname bgcolor fullscreen} {
 		# We init variable
 		variable self $classname
 		variable image_loaded ""
@@ -35,14 +36,15 @@ oo::class create Board {
 		variable selected_items ""
 		variable old_cursor_coord ""
 		variable current_scale_factor 0
-		variable canvas_height $height
-		variable canvas_width $width
+		
+		# We config the gui
+		if $fullscreen {wm attributes . -fullscreen 1}
 		
 		# We create the board
 		variable master [frame .master]
 		# We make the body layout
 		frame $master.body
-		variable canvas [canvas $master.body.canvas -width $width -height $height -background $bgcolor]
+		variable canvas [canvas $master.body.canvas -background $bgcolor]
 		
 		# We make binding
 		bind $canvas <Button-1> "$self mouse_click %x %y"
@@ -57,7 +59,7 @@ oo::class create Board {
 		#
 		
 		# We build the color tools
-		variable button_color [ttk::menubutton $master.tools.color -text color]
+		variable button_color [ttk::menubutton $master.tools.color -compound bottom -image [my load_image icons/paint.png gui]]
 		# We build the color menu
 		menu $button_color.menu -tearoff 0
 		# We add data
@@ -68,7 +70,7 @@ oo::class create Board {
 		$button_color config -menu $button_color.menu
 		
 		# We build the size tools
-		variable button_size [ttk::menubutton $master.tools.size -text size]
+		variable button_size [ttk::menubutton $master.tools.size -compound bottom -image [my load_image icons/size.png gui]]
 		# We build the size menu
 		menu $button_size.menu -tearoff 0
 		# We add data
@@ -78,10 +80,10 @@ oo::class create Board {
 		# We add the size menu
 		$button_size config -menu $button_size.menu
 		
-		variable button_image [ttk::button $master.tools.image -text image -command "$self add_image {}"]
+		variable button_image [ttk::button $master.tools.image -compound bottom -image [my load_image icons/image.png gui] -command "$self add_image {}"]
 		
 		# We build  the select tools
-		variable button_select [ttk::menubutton $master.tools.select -text select]
+		variable button_select [ttk::menubutton $master.tools.select -compound bottom -image [my load_image icons/select.png gui]]
 		# We build the select menu
 		menu $button_select.menu -tearoff 0
 		# We add command
@@ -91,16 +93,16 @@ oo::class create Board {
 		$button_select config -menu $button_select.menu
 		
 		# We build the move tools
-		variable button_move [ttk::button $master.tools.move -text move -command "$self move_items_selected"]
+		variable button_move [ttk::button $master.tools.move -compound bottom -image [my load_image icons/move.png gui] -command "$self move_items_selected"]
 		
 		# We build the delete tools
-		variable button_delete [ttk::button $master.tools.delete -text delete -command "$self delete_items_selected"]
+		variable button_delete [ttk::button $master.tools.delete -compound bottom -image [my load_image icons/cancel.png gui] -command "$self delete_items_selected"]
 		
 		# We build the duplicated tools
-		variable button_duplicated [ttk::button $master.tools.duplicated -text duplicate -command "$self duplicate_items_selected"]
+		variable button_duplicated [ttk::button $master.tools.duplicated -compound bottom -image [my load_image icons/duplicate.png gui] -command "$self duplicate_items_selected"]
 		
 		# We build the scale tools
-		variable button_scale [ttk::menubutton $master.tools.sclale -text scale]
+		variable button_scale [ttk::menubutton $master.tools.sclale -compound bottom -image [my load_image icons/scale.png gui]]
 		# We build the scale menu
 		menu $button_scale.menu -tearoff 0
 		# We add command
@@ -272,14 +274,15 @@ oo::class create Board {
 		}
 		# We verify if filename got
 		if [string length $filename] {
-			set img [my load_image $filename]
-			$canvas create image 10 10 -image $img
+			set img [my load_image $filename canvas]
+			$canvas create image [expr [lindex [$canvas config -width] end]/2] [expr [lindex [$canvas config -height] end]/2] -image $img
 		}
 	}
-	method load_image filename {
+	method load_image {filename tag} {
 		variable image_loaded
 		set img [image create photo -file $filename]
-		lappend image_loaded $img
+		# We add tag to know where the img is used
+		lappend image_loaded $tag $img
 		return $img
 	}
 	method duplicate_items_selected {} {
@@ -307,17 +310,67 @@ oo::class create Board {
 		variable selected_items
 		variable canvas
 		variable current_scale_factor
-		variable canvas_height
-		variable canvas_width
 		# We scale all items selected
 		foreach item $selected_items {
 			set factor [expr pow(2, $current_scale_factor)]
 			# We scale with for origin the middle of the canvas
-			$canvas scale $item [expr $canvas_width/2] [expr $canvas_height/2] $factor $factor
+			$canvas scale $item [expr [lindex [$canvas config -width] end]/2] [expr [lindex [$canvas config -height] end]/2] $factor $factor
+			# We verify if image
+			if [string equal [$canvas type $item] image] {
+				# We resize the image
+				set img [lindex [$canvas itemconfig $item -image] end]
+				# We create temp image
+				image create photo tmp
+				# We get geometry
+				set width [expr int([image width $img]*$factor)]
+				set height [expr int([image height $img]*$factor)]
+				# We resize
+				resize $img [set width]x[set height] tmp
+				# We reset the image
+				$img blank
+				$img config -width $width -height $height
+				$img copy tmp
+				# We delete the temp image
+				image delete tmp
+			}
 		}
 	}
 	method change_current_scale_factor factor {
 		variable current_scale_factor $factor
+	}
+	method auto_ajust {{width 0} {height 0}} {
+		variable self
+		variable canvas
+		variable image_loaded
+		# We get the geometry
+		set geometry [split [lindex [split [wm geometry .] +] 0] x]
+		set current_width [lindex $geometry 0]
+		set current_height [lindex $geometry 1]
+		# We verify if geometry has changed (We ignore the minor changing)
+		# We config the marge of geometry to ignore
+		set margin 20
+		if {$height <= $width && [expr abs($current_width-$width)] > $margin | [expr abs($current_height-$height)] > $margin} {
+			########
+			#    DO NOT USE ALL THE SCREEN (100%), BECAUSE CAN CAUSED PROBLEM OF AJUST
+			########
+			# We resize the canvas
+			$canvas config -width $current_width -height [expr $current_height * .85]
+			# We resize the tools buttons
+			# We get the size
+			set size [expr int($current_height * .09)]
+			foreach "tag img" $image_loaded {
+				if [string equal $tag gui] {
+					# We create the tmp image
+					image create photo tmp -file [lindex [$img config -file] end]
+					# We clean the image
+					$img blank
+					# We resize
+					resize tmp [set size]x[set size] $img
+					image delete tmp
+				}
+			}
+		}
+		after 50 "$self auto_ajust $current_width $current_height"
 	}
 	destructor {
 		variable master

@@ -12,7 +12,8 @@ proc launch {} {
 set test 1
 
 if $test {
-	Board create board board 600 320 black
+	Board create board board white 0
+	after 50 "board auto_ajust"
 } else {
 	pack [frame .config]
 	pack [ttk::label .config.l1 -text Width:]
