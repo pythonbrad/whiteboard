@@ -1,9 +1,9 @@
 #!/usr/bin/wish
 #====================================================================#
-#     Editor written in Tcl/Tk for editing open source project       #
+#     EduBoard written in Tcl/Tk for editing open source project       #
 #		            (c) Fomegne Meudje; 25-05-20                     #
 #====================================================================#
-#    Author: pythonbrad
+#    Author: pythonbrad (Fomegne Meudje)
 #    Email: fomegnemeudje@outlook.com
 #    Github: http://github.com/pythonbrad
 # * 
@@ -22,6 +22,7 @@
 
 package require Tk 8.6
 source resize.tcl
+source auto_ajust.tcl
 
 oo::class create Board {
 	constructor {classname bgcolor fullscreen} {
@@ -59,7 +60,7 @@ oo::class create Board {
 		#
 		
 		# We build the color tools
-		variable button_color [ttk::menubutton $master.tools.color -compound bottom -image [my load_image icons/paint.png gui]]
+		variable button_color [ttk::menubutton $master.tools.color -compound top -text color -image [my load_image icons/paint.png gui]]
 		# We build the color menu
 		menu $button_color.menu -tearoff 0
 		# We add data
@@ -70,7 +71,7 @@ oo::class create Board {
 		$button_color config -menu $button_color.menu
 		
 		# We build the size tools
-		variable button_size [ttk::menubutton $master.tools.size -compound bottom -image [my load_image icons/size.png gui]]
+		variable button_size [ttk::menubutton $master.tools.size -compound top -text size -image [my load_image icons/size.png gui]]
 		# We build the size menu
 		menu $button_size.menu -tearoff 0
 		# We add data
@@ -80,10 +81,10 @@ oo::class create Board {
 		# We add the size menu
 		$button_size config -menu $button_size.menu
 		
-		variable button_image [ttk::button $master.tools.image -compound bottom -image [my load_image icons/image.png gui] -command "$self add_image {}"]
+		variable button_image [ttk::button $master.tools.image -compound top -text image -image [my load_image icons/image.png gui] -command "$self add_image {}"]
 		
 		# We build  the select tools
-		variable button_select [ttk::menubutton $master.tools.select -compound bottom -image [my load_image icons/select.png gui]]
+		variable button_select [ttk::menubutton $master.tools.select -compound top -text select -image [my load_image icons/select.png gui]]
 		# We build the select menu
 		menu $button_select.menu -tearoff 0
 		# We add command
@@ -93,16 +94,16 @@ oo::class create Board {
 		$button_select config -menu $button_select.menu
 		
 		# We build the move tools
-		variable button_move [ttk::button $master.tools.move -compound bottom -image [my load_image icons/move.png gui] -command "$self move_items_selected"]
+		variable button_move [ttk::button $master.tools.move -compound top -text move -image [my load_image icons/move.png gui] -command "$self move_items_selected"]
 		
 		# We build the delete tools
-		variable button_delete [ttk::button $master.tools.delete -compound bottom -image [my load_image icons/cancel.png gui] -command "$self delete_items_selected"]
+		variable button_delete [ttk::button $master.tools.delete -compound top -text delete -image [my load_image icons/cancel.png gui] -command "$self delete_items_selected"]
 		
-		# We build the duplicated tools
-		variable button_duplicated [ttk::button $master.tools.duplicated -compound bottom -image [my load_image icons/duplicate.png gui] -command "$self duplicate_items_selected"]
+		# We build the duplicate tools
+		variable button_duplicate [ttk::button $master.tools.duplicated -compound top -text duplicate -image [my load_image icons/duplicate.png gui] -command "$self duplicate_items_selected"]
 		
 		# We build the scale tools
-		variable button_scale [ttk::menubutton $master.tools.sclale -compound bottom -image [my load_image icons/scale.png gui]]
+		variable button_scale [ttk::menubutton $master.tools.sclale -compound top -text scale -image [my load_image icons/scale.png gui]]
 		# We build the scale menu
 		menu $button_scale.menu -tearoff 0
 		# We add command
@@ -125,8 +126,23 @@ oo::class create Board {
 		pack $button_select -side left
 		pack $button_move -side left
 		pack $button_delete -side left
-		pack $button_duplicated -side left
+		pack $button_duplicate -side left
 		pack $button_scale -side left
+		
+		# We update the gui before others operations
+		update
+		
+		# We config and launch the auto ajust
+		set ::auto_ajust::canvas "$canvas 1 .9"
+		# We config all gui image for the auto ajust
+		foreach "tag image" $image_loaded {
+			# We verify if image of gui
+			if {[string equal $tag gui]} {
+				lappend ::auto_ajust::images $image height .05
+			}
+		}
+		# We launch
+		::auto_ajust::run
 	}
 	method change_color color {
 		variable button_color
@@ -267,6 +283,7 @@ oo::class create Board {
 	method add_image filename {
 		variable master
 		variable canvas
+		variable selected_items
 		# We verify if filename passed in argument
 		if ![string length $filename] {
 			# We ask filename
@@ -275,12 +292,21 @@ oo::class create Board {
 		# We verify if filename got
 		if [string length $filename] {
 			set img [my load_image $filename canvas]
-			$canvas create image [expr [lindex [$canvas config -width] end]/2] [expr [lindex [$canvas config -height] end]/2] -image $img
+			# We create and mark it selected
+			 variable selected_items [$canvas create image [expr [lindex [$canvas config -width] end]/2] [expr [lindex [$canvas config -height] end]/2] -image $img]
 		}
 	}
 	method load_image {filename tag} {
 		variable image_loaded
-		set img [image create photo -file $filename]
+		# We load image and catch error if got
+		if [catch {
+			set img [image create photo -file $filename]
+		} err] {
+			# We load error icon
+			set img [image create photo -data [lindex [tk::icons::error config -data] end]]
+			# We advice the user
+			tk_messageBox -message "Error while loading image" -title error -detail $err -icon error
+		}
 		# We add tag to know where the img is used
 		lappend image_loaded $tag $img
 		return $img
@@ -313,64 +339,27 @@ oo::class create Board {
 		# We scale all items selected
 		foreach item $selected_items {
 			set factor [expr pow(2, $current_scale_factor)]
-			# We scale with for origin the middle of the canvas
-			$canvas scale $item [expr [lindex [$canvas config -width] end]/2] [expr [lindex [$canvas config -height] end]/2] $factor $factor
 			# We verify if image
 			if [string equal [$canvas type $item] image] {
 				# We resize the image
 				set img [lindex [$canvas itemconfig $item -image] end]
-				# We create temp image
-				image create photo tmp
 				# We get geometry
 				set width [expr int([image width $img]*$factor)]
 				set height [expr int([image height $img]*$factor)]
-				# We resize
-				resize $img [set width]x[set height] tmp
-				# We reset the image
-				$img blank
-				$img config -width $width -height $height
-				$img copy tmp
-				# We delete the temp image
-				image delete tmp
+				# We resize with geometry of power of 2 enabled
+				# to improve the perfomance for the next resize of this image
+				::imgResize::resize $img [set width] [set height] 1
+			} else {
+				# We scale with for origin the middle of the canvas
+				$canvas scale $item [expr [lindex [$canvas config -width] end]/2] [expr [lindex [$canvas config -height] end]/2] $factor $factor
 			}
 		}
 	}
 	method change_current_scale_factor factor {
+		variable button_scale
 		variable current_scale_factor $factor
-	}
-	method auto_ajust {{width 0} {height 0}} {
-		variable self
-		variable canvas
-		variable image_loaded
-		# We get the geometry
-		set geometry [split [lindex [split [wm geometry .] +] 0] x]
-		set current_width [lindex $geometry 0]
-		set current_height [lindex $geometry 1]
-		# We verify if geometry has changed (We ignore the minor changing)
-		# We config the marge of geometry to ignore
-		set margin 20
-		if {$height <= $width && [expr abs($current_width-$width)] > $margin | [expr abs($current_height-$height)] > $margin} {
-			########
-			#    DO NOT USE ALL THE SCREEN (100%), BECAUSE CAN CAUSED PROBLEM OF AJUST
-			########
-			# We resize the canvas
-			$canvas config -width $current_width -height [expr $current_height * .85]
-			# We resize the tools buttons
-			# We get the size
-			set size [expr int($current_height * .09)]
-			foreach "tag img" $image_loaded {
-				if [string equal $tag gui] {
-					# We create the tmp image
-					image create photo tmp -file [lindex [$img config -file] end]
-					# We clean the image
-					$img blank
-					# We resize
-					resize tmp [set size]x[set size] $img
-					image delete tmp
-				}
-			}
-		}
-		after 50 "$self auto_ajust $current_width $current_height"
+		# We update the gui
+		$button_scale config -text $factor
 	}
 	destructor {
 		variable master
