@@ -116,18 +116,8 @@ oo::class create Board {
 		$button_scale config -menu $button_scale.menu
 		
 		# We build the board
-		pack $master
-		pack $master.body
-		pack $canvas
-		pack $master.tools
-		pack $button_color -side left
-		pack $button_size -side left
-		pack $button_image -side left
-		pack $button_select -side left
-		pack $button_move -side left
-		pack $button_delete -side left
-		pack $button_duplicate -side left
-		pack $button_scale -side left
+		pack $master $master.body $canvas $master.tools
+		pack $button_color $button_size $button_image $button_select $button_move $button_delete $button_duplicate $button_scale -side left
 		
 		# We update the gui before others operations
 		update
@@ -144,6 +134,9 @@ oo::class create Board {
 		# We launch
 		::auto_ajust::run
 	}
+	# This method permit to change the color of drawing
+	# Argument: if color not given, we ask to user to choose a color
+	#
 	method change_color color {
 		variable button_color
 		variable current_color
@@ -159,6 +152,9 @@ oo::class create Board {
 			$button_color config -text $color
 		}
 	}
+	# This method permit to change the size of drawing line
+	# Argument: size in integer
+	#
 	method change_size size {
 		variable button_size
 		# If size passed in argument, I change
@@ -168,6 +164,10 @@ oo::class create Board {
 			$button_size config -text $size
 		}
 	}
+	# This method permit to do begin an action in function of the mode choosed
+	# It call while the event mouse clicking
+	# Argument: x and y represent coord in the canvas
+	#
 	method mouse_click {x y} {
 		variable current_mode
 		variable canvas
@@ -196,6 +196,9 @@ oo::class create Board {
 			}
 		}
 	}
+	# This method permet to end a action in function of the mode choosed
+	# It call while the event mouse releasing
+	#
 	method mouse_click_release {} {
 		variable current_mode
 		variable selected_items
@@ -220,6 +223,9 @@ oo::class create Board {
 		}
 		variable current_mode ""
 	}
+	# This method permit to do a action in loop while calling
+	# It call while the event mouse moving
+	# Argument: x and y represent coord in the canvas
 	method mouse_move {x y} {
 		variable current_mode
 		variable current_item
@@ -256,15 +262,21 @@ oo::class create Board {
 			}
 		}
 	}
+	# This method active the selecting mode to can selected items
+	#
 	method select_items {} {
 		# We change the mode
 		variable current_mode selecting
 	}
+	# This method select all items in the canavs
+	#
 	method select_all_items {} {
 		variable canvas
 		# We get all items
 		variable selected_items [$canvas find all]
 	}
+	# This method delete all items selected
+	#
 	method delete_items_selected {} {
 		# We change the mode
 		variable current_mode deleting
@@ -276,10 +288,14 @@ oo::class create Board {
 		}
 		variable selected_items ""
 	}
+	# This method active the moving mode to move items selected
+	#
 	method move_items_selected {} {
 		# We change the mode
 		variable current_mode moving
 	}
+	# This method permit to add image in the canvas
+	# Argument: filename represent the destination of this image
 	method add_image filename {
 		variable master
 		variable canvas
@@ -296,6 +312,11 @@ oo::class create Board {
 			 variable selected_items [$canvas create image [expr [lindex [$canvas config -width] end]/2] [expr [lindex [$canvas config -height] end]/2] -image $img]
 		}
 	}
+	# This method permit to manage the loading images
+	# Argument: filename represent the destination of this image
+	#			tag represent an id of this image
+	# Return the image created
+	#
 	method load_image {filename tag} {
 		variable image_loaded
 		# We load image and catch error if got
@@ -311,6 +332,8 @@ oo::class create Board {
 		lappend image_loaded $tag $img
 		return $img
 	}
+	# This method permit to duplicate all items selected
+	#
 	method duplicate_items_selected {} {
 		variable selected_items
 		variable canvas
@@ -332,6 +355,8 @@ oo::class create Board {
 			}
 		}
 	}
+	# This method permit to resize (double, half) all items selected
+	#
 	method scale_items_selected {} {
 		variable selected_items
 		variable canvas
@@ -355,6 +380,8 @@ oo::class create Board {
 			}
 		}
 	}
+	# This method permit to cahange the factor of scaling
+	# Argument: factor
 	method change_current_scale_factor factor {
 		variable button_scale
 		variable current_scale_factor $factor

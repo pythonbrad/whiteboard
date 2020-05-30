@@ -26,10 +26,12 @@ namespace eval ::auto_ajust {
 	# width and height represent old geometry
 	variable old_width 0
 	variable old_height 0
-	# THis variable is a bool to invert geometry, if need
+	# this variable is a bool to invert geometry, if need
 	variable geometry_invert 0
 	# We config the marge of geometry to ignore, should be in percent
 	variable margin .01;#~1% of the geometry
+	# this variable permit to know if auto ajust completed
+	variable stable 0
 }
 
 # This function permit to make a window responsive
@@ -40,6 +42,7 @@ proc ::auto_ajust::run {} {
 	variable old_width
 	variable geometry_invert
 	variable margin
+	variable stable
 	# We get the geometry
 	set geometry [split [lindex [split [wm geometry .] +] 0] x]
 	if $geometry_invert {
@@ -49,6 +52,8 @@ proc ::auto_ajust::run {} {
 	set current_height [lindex $geometry 1]
 	# We verify if geometry has changed (We ignore the minor changing)
 	if {[expr abs($current_width-$old_width)] > $old_width*$margin | [expr abs($current_height-$old_height)] > $old_height*$margin} {
+		# We mark not stable
+		if $stable {variable stable 0}
 		########
 		#    DO NOT USE ALL THE SCREEN (100%), BECAUSE CAN CAUSED PROBLEM OF AJUST
 		########
@@ -89,6 +94,9 @@ proc ::auto_ajust::run {} {
 			# to improve the perfomance for the next resize of this image
 			::imgResize::resize $image $sizex $sizey 1
 		}
+	} else {
+		# We marl stable
+		if !$stable {variable stable 1}
 	}
 	variable old_height $current_height
 	variable old_width $current_width
