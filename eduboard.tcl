@@ -1,6 +1,6 @@
 #!/usr/bin/wish
 #====================================================================#
-#     EduBoard written in Tcl/Tk for editing open source project       #
+#     EduBoard written in Tcl/Tk for editing open source project     #
 #		            (c) Fomegne Meudje; 25-05-20                     #
 #====================================================================#
 #    Author: pythonbrad (Fomegne Meudje)
@@ -23,6 +23,7 @@
 package require Tk 8.6
 source resize.tcl
 source auto_ajust.tcl
+source history.tcl
 
 oo::class create Board {
 	constructor {classname bgcolor fullscreen} {
@@ -38,98 +39,123 @@ oo::class create Board {
 		variable old_cursor_coord ""
 		variable current_scale_factor 0
 		
+		wm title . EduBoard
+		
 		# We config the gui
 		if $fullscreen {wm attributes . -fullscreen 1}
 		
-		# We create the board
-		variable master [frame .master]
-		# We make the body layout
-		frame $master.body
-		variable canvas [canvas $master.body.canvas -background $bgcolor]
+		# We config the history
+		set ::undoAndRedo::logfile ""
 		
-		# We make binding
-		bind $canvas <Button-1> "$self mouse_click %x %y"
-		bind $canvas <ButtonRelease> "$self mouse_click_release"
-		bind $canvas <Motion> "$self mouse_move %x %y"
+		# We config the menu
+		menu .menu -tearoff 0
 		
-		# We make the tools layout
-		frame $master.tools
-		
-		#
-		# USE POST COMMAND WITH MENUBUTTON WHILE THE EVENT INVOKE IF WANT USED AN SIMPLE BUTTON
-		#
-		
-		# We build the color tools
-		variable button_color [ttk::menubutton $master.tools.color -compound top -text color -image [my load_image icons/paint.png gui]]
-		# We build the color menu
-		menu $button_color.menu -tearoff 0
+		# We create the color tools
+		menu .menu.color -tearoff 0
 		# We add data
 		foreach "color code" "black #000000 white #FFFFFF grey #4D4D4D green #008000 yellow #FFFF00 blue #1E90FF brown #A52A2A eraser $bgcolor more {}" {
-			$button_color.menu add command -label $color -command "$self change_color {$code}" -background $code -foreground $code
+			.menu.color add command -label $color -command "eval \[::undoAndRedo::do {$self change_color {$code}} {}\]" -background $code -foreground $code
 		}
-		# We add the color menu
-		$button_color config -menu $button_color.menu
+		# We add the color tools
+		.menu add cascade -menu .menu.color -compound top -label Color -image [my load_image icons/paint.png menu]
 		
-		# We build the size tools
-		variable button_size [ttk::menubutton $master.tools.size -compound top -text size -image [my load_image icons/size.png gui]]
-		# We build the size menu
-		menu $button_size.menu -tearoff 0
+		# We create the size tools
+		menu .menu.size -tearoff 0
 		# We add data
 		foreach size "1 2 4 6 8 10" {
-			$button_size.menu add command -label $size -command "$self change_size $size"
+			.menu.size add command -label $size -command "eval \[::undoAndRedo::do {$self change_size {$size}} {}\]"
 		}
-		# We add the size menu
-		$button_size config -menu $button_size.menu
+		# We add the size tools
+		.menu add cascade -menu .menu.size -compound top -label Size -image [my load_image icons/size.png menu]
 		
-		variable button_image [ttk::button $master.tools.image -compound top -text image -image [my load_image icons/image.png gui] -command "$self add_image {}"]
+		# We add the image tools
+		.menu add command -compound top -label Image -image [my load_image icons/image.png menu] -command "$self add_image {}"
 		
-		# We build  the select tools
-		variable button_select [ttk::menubutton $master.tools.select -compound top -text select -image [my load_image icons/select.png gui]]
-		# We build the select menu
-		menu $button_select.menu -tearoff 0
+		# We create the select tools
+		menu .menu.select -tearoff 0
 		# We add command
-		$button_select.menu add command -label drag -command "$self select_items"
-		$button_select.menu add command -label all -command "$self select_all_items"
-		# We addd the select menu
-		$button_select config -menu $button_select.menu
+		.menu.select add command -label Drag -command "eval \[::undoAndRedo::do {$self select_items} {}\]"
+		.menu.select add command -label All -command "eval \[::undoAndRedo::do {$self select_all_items} {}\]"
+		# We add the select menu
+		.menu add cascade -menu .menu.select -compound top -label Select -image [my load_image icons/select.png menu]
 		
-		# We build the move tools
-		variable button_move [ttk::button $master.tools.move -compound top -text move -image [my load_image icons/move.png gui] -command "$self move_items_selected"]
+		# We add the move tools
+		.menu add command -compound top -label Move -image [my load_image icons/move.png menu] -command "eval \[::undoAndRedo::do {$self move_items_selected} {}\]"
+		# We add the delete tools
+		.menu add command -compound top -label Delete -image [my load_image icons/cancel.png menu] -command "eval \[::undoAndRedo::do {$self delete_items_selected} {}\]"
+		# We add the duplicate tools
+		.menu add command -compound top -label Duplicate -image [my load_image icons/duplicate.png menu] -command "eval \[::undoAndRedo::do {$self duplicate_items_selected} {}\]"
 		
-		# We build the delete tools
-		variable button_delete [ttk::button $master.tools.delete -compound top -text delete -image [my load_image icons/cancel.png gui] -command "$self delete_items_selected"]
-		
-		# We build the duplicate tools
-		variable button_duplicate [ttk::button $master.tools.duplicated -compound top -text duplicate -image [my load_image icons/duplicate.png gui] -command "$self duplicate_items_selected"]
-		
-		# We build the scale tools
-		variable button_scale [ttk::menubutton $master.tools.sclale -compound top -text scale -image [my load_image icons/scale.png gui]]
-		# We build the scale menu
-		menu $button_scale.menu -tearoff 0
+		# We create the scale tools
+		menu .menu.scale -tearoff 0
 		# We add command
-		menu $button_scale.menu.factor -tearoff 0
-		$button_scale.menu.factor add radiobutton -label 1 -command "$self change_current_scale_factor 1"
-		$button_scale.menu.factor add radiobutton -label -1 -command "$self change_current_scale_factor -1"
-		$button_scale.menu add cascade -label factor -menu $button_scale.menu.factor
-		$button_scale.menu add command -label scale -command "$self scale_items_selected"
-		# We addd the scale menu
-		$button_scale config -menu $button_scale.menu
+		menu .menu.scale.factor -tearoff 0
+		.menu.scale.factor add radiobutton -label 1 -command "eval \[::undoAndRedo::do {$self change_current_scale_factor 1} {}\]"
+		.menu.scale.factor add radiobutton -label -1 -command "eval \[::undoAndRedo::do {$self change_current_scale_factor -1} {}\]"
+		.menu.scale add cascade -label Factor -menu .menu.scale.factor
+		.menu.scale add command -label Scale -command "eval \[::undoAndRedo::do {$self scale_items_selected} {}\]"
+		# We add the scale tools
+		.menu add cascade -compound top -label Scale -image [my load_image icons/scale.png menu] -menu .menu.scale
+
+		# We create the draw tools
+		menu .menu.draw -tearoff 0
+		.menu.draw add command -label Line
+		.menu.draw add command -label Arc
+		.menu.draw add command -label Oval
+		.menu.draw add command -label Polygon
+		.menu.draw add command -label Rectangle
+		# We add the draw tools
+		.menu add cascade -label Draw -menu .menu.draw -image [my load_image icons/move.png menu] -compound top
+		
+		# We create the network tools
+		menu .menu.network -tearoff 0
+		.menu.network add command -label Client -command server_connect
+		.menu.network add command -label Server -command server_bind
+		# We add the network tools
+		.menu add cascade -label Network -menu .menu.network -image [my load_image icons/network.png menu] -compound top
+		
+		# We create the recoder tools
+		menu .menu.recoder -tearoff 0
+		.menu.recoder add command -label Start -command "$self recoder_start" -image [my load_image icons/dialog-yes.png submenu] -compound left
+		.menu.recoder add command -label Stop -command "$self recoder_stop" -image [my load_image icons/dialog-no.png submenu] -compound left
+		# We add the recoder tools
+		.menu add cascade -label Recoder -menu .menu.recoder -image [my load_image icons/server.png menu] -compound top
+		
+		# We create the playing tools
+		menu .menu.player -tearoff 0
+		.menu.player add command -label Start -command "$self play_recoding" -image [my load_image icons/media-play.png submenu] -compound left
+		.menu.player add command -label Pause -command "$self pause_recording" -image [my load_image icons/media-pause.png submenu] -compound left
+		.menu.player add command -label Stop -command "$self stop_recording" -image [my load_image icons/media-stop.png submenu] -compound left
+		# We add the recoder tools
+		.menu add cascade -label Player -menu .menu.player -image [my load_image icons/media-play.png menu] -compound top
+		
+		# We add the menu
+		. configure -menu .menu
+		
+		# We create the board
+		variable canvas [canvas .canvas -background $bgcolor]
+		
+		# We set binding
+		bind $canvas <Button-1> "eval \[::undoAndRedo::do {$self mouse_click %x %y} {}\]"
+		bind $canvas <ButtonRelease> "eval \[::undoAndRedo::do {$self mouse_click_release} {}\]"
+		bind $canvas <Motion> "eval \[::undoAndRedo::do {$self mouse_move %x %y} {}\]"
 		
 		# We build the board
-		pack $master $master.body $canvas $master.tools
-		pack $button_color $button_size $button_image $button_select $button_move $button_delete $button_duplicate $button_scale -side left
+		pack $canvas
 		
 		# We update the gui before others operations
 		update
 		
-		# We config and launch the auto ajust
-		set ::auto_ajust::canvas "$canvas 1 .9"
-		# We config all gui image for the auto ajust
+		# We config and launch the auto ajust, the canvas get all the height and width
+		set ::auto_ajust::canvas "$canvas 1 1"
+		# We config all gui image
 		foreach "tag image" $image_loaded {
 			# We verify if image of gui
-			if {[string equal $tag gui]} {
-				lappend ::auto_ajust::images $image height .05
-			}
+			if {[string equal $tag menu]} {
+				::imgResize::resize $image 16 16
+			} elseif {[string equal $tag submenu]} {
+				::imgResize::resize $image 16 16
+			} else {}
 		}
 		# We launch
 		::auto_ajust::run
@@ -138,30 +164,23 @@ oo::class create Board {
 	# Argument: if color not given, we ask to user to choose a color
 	#
 	method change_color color {
-		variable button_color
 		variable current_color
-		variable master
 		# We verify if color passed in argument, if not and ask color
 		if ![string length $color] {
-			set color [tk_chooseColor -parent $master -initialcolor $current_color]
+			set color [tk_chooseColor -initialcolor $current_color]
 		}
 		# If color got, I change
 		if [string length $color] {
 			variable current_color $color
-			# We update the gui
-			$button_color config -text $color
 		}
 	}
 	# This method permit to change the size of drawing line
 	# Argument: size in integer
 	#
 	method change_size size {
-		variable button_size
 		# If size passed in argument, I change
 		if [string length $size] {
 			variable current_size $size
-			# We update the gui
-			$button_size config -text $size
 		}
 	}
 	# This method permit to do begin an action in function of the mode choosed
@@ -203,9 +222,7 @@ oo::class create Board {
 		variable current_mode
 		variable selected_items
 		variable canvas
-		# We clean any data
-		variable current_item ""
-		variable can_draw 0
+		variable current_item
 		# We analyse the current mode
 		switch -- $current_mode {
 			selecting {
@@ -219,6 +236,13 @@ oo::class create Board {
 			deleting {
 				# We clean the selector
 				$canvas delete selector
+			}
+			default {
+				# We select the drawing
+				variable selected_items $current_item
+				# We clean any data
+				variable current_item ""
+				variable can_draw 0
 			}
 		}
 		variable current_mode ""
@@ -297,17 +321,22 @@ oo::class create Board {
 	# This method permit to add image in the canvas
 	# Argument: filename represent the destination of this image
 	method add_image filename {
-		variable master
 		variable canvas
 		variable selected_items
+		variable self
 		# We verify if filename passed in argument
 		if ![string length $filename] {
 			# We ask filename
-			set filename [tk_getOpenFile -parent $master]
+			set filename [tk_getOpenFile]
 		}
 		# We verify if filename got
 		if [string length $filename] {
 			set img [my load_image $filename canvas]
+			# We log the action
+			set f [open $filename rb]
+			set data [read $f]
+			close $f
+			::undoAndRedo::do "set filename download/\[clock clicks\];file mkdir download;set f \[open \$filename wb\];puts \$f \[binary decode base64 {[binary encode base64 $data]}\];close \$f;$self add_image \$filename" ""
 			# We create and mark it selected
 			 variable selected_items [$canvas create image [expr [lindex [$canvas config -width] end]/2] [expr [lindex [$canvas config -height] end]/2] -image $img]
 		}
@@ -380,13 +409,64 @@ oo::class create Board {
 			}
 		}
 	}
-	# This method permit to cahange the factor of scaling
+	# This method permit to change the factor of scaling
 	# Argument: factor
 	method change_current_scale_factor factor {
-		variable button_scale
 		variable current_scale_factor $factor
-		# We update the gui
-		$button_scale config -text $factor
+	}
+	# This method permit to load an recording
+	# Argument: src
+	method play_recoding {} {
+		set src [tk_getOpenFile]
+		set type file
+		if [string length $src] {
+			tk_messageBox -title Playing -message "The playing will start" -icon info
+			# We disable the tools
+			for {set i 0} {$i < 100} {incr i} {
+				.menu entryconf $i -state disable
+			}
+			# We set the begin time
+			set start_time [clock milli]
+			# We verify the type
+			if {[string equal $type file]} {
+				# We read the src
+				set f [open $src rb]
+				set data [read $f]
+				close $f
+				# We load each frame
+				foreach frame [split $data \n] {
+					# We get frame data
+					set timer [lindex $frame 0]
+					set cmd [lindex $frame 1]
+					# We wait the timer and excute cmd after
+					while 1 {
+						set current_time [clock milli]
+						# We verify if timer got
+						if {$current_time - $start_time >= $timer} {
+							eval $cmd
+							break
+						}
+						# We update the gui
+						update
+					}
+				}
+				tk_messageBox -title Playing -message Finish -icon info
+			}
+			# We enable the tools
+			for {set i 0} {$i < 100} {incr i} {
+				.menu entryconf $i -state normal
+			}
+		}
+	}
+	method recoder_start {} {
+		set filename [tk_getSaveFile]
+		if [string length $filename] {
+			set ::undoAndRedo::logfile $filename
+			set ::undoAndRedo::start_time [clock milli]
+		}
+	}
+	method recoder_stop {} {
+		set ::undoAndRedo::logfile ""
 	}
 	destructor {
 		variable master
