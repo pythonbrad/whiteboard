@@ -38,6 +38,7 @@ oo::class create Board {
 		variable selected_items ""
 		variable old_cursor_coord ""
 		variable current_scale_factor 0
+		variable is_playing 0
 		
 		wm title . EduBoard
 		
@@ -123,7 +124,7 @@ oo::class create Board {
 		
 		# We create the playing tools
 		menu .menu.player -tearoff 0
-		.menu.player add command -label Start -command "$self play_recoding" -image [my load_image icons/media-play.png submenu] -compound left
+		.menu.player add command -label Start -command "$self play_recording" -image [my load_image icons/media-play.png submenu] -compound left
 		.menu.player add command -label Pause -command "$self pause_recording" -image [my load_image icons/media-pause.png submenu] -compound left
 		.menu.player add command -label Stop -command "$self stop_recording" -image [my load_image icons/media-stop.png submenu] -compound left
 		# We add the recoder tools
@@ -136,9 +137,9 @@ oo::class create Board {
 		variable canvas [canvas .canvas -background $bgcolor]
 		
 		# We set binding
-		bind $canvas <Button-1> "eval \[::undoAndRedo::do {$self mouse_click %x %y} {}\]"
-		bind $canvas <ButtonRelease> "eval \[::undoAndRedo::do {$self mouse_click_release} {}\]"
-		bind $canvas <Motion> "eval \[::undoAndRedo::do {$self mouse_move %x %y} {}\]"
+		bind $canvas <Button-1> "if {\[$self can_edit\]} {eval \[::undoAndRedo::do {$self mouse_click %x %y} {}\]}"
+		bind $canvas <ButtonRelease> "if {\[$self can_edit\]} {eval \[::undoAndRedo::do {$self mouse_click_release} {}\]}"
+		bind $canvas <Motion> "if {\[$self can_edit\]} {eval \[::undoAndRedo::do {$self mouse_move %x %y} {}\]}"
 		
 		# We build the board
 		pack $canvas
@@ -414,13 +415,19 @@ oo::class create Board {
 	method change_current_scale_factor factor {
 		variable current_scale_factor $factor
 	}
+	method can_edit {} {
+		variable is_playing
+		return [expr !$is_playing]
+	}
 	# This method permit to load an recording
 	# Argument: src
-	method play_recoding {} {
+	method play_recording {} {
 		set src [tk_getOpenFile]
 		set type file
 		if [string length $src] {
 			tk_messageBox -title Playing -message "The playing will start" -icon info
+			# We disable the edit mode
+			variable is_playing 1
 			# We disable the tools
 			for {set i 0} {$i < 100} {incr i} {
 				.menu entryconf $i -state disable
@@ -456,6 +463,8 @@ oo::class create Board {
 			for {set i 0} {$i < 100} {incr i} {
 				.menu entryconf $i -state normal
 			}
+			# We enable the edit mode
+			variable is_playing 0
 		}
 	}
 	method recoder_start {} {
