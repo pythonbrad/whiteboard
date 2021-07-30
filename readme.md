@@ -1,3 +1,3 @@
 # Whiteboard
 
-![Image](https://github.com/pythonbrad/student_agenda/blob/master/screen.png)
+![Image](https://github.com/pythonbrad/whiteboard/blob/master/screen.png)
